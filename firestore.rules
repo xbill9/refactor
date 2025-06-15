@@ -4,64 +4,105 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is authenticated
+    // Helper function to check if a user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Users collection
-    // Users can create their own user document, and read/update their own.
+    // Helper function to get a document's data if it exists and has data, otherwise null
+    // This helps prevent accessing .data on a non-existent or empty document directly
+    function getDocData(docPath) {
+      let doc = get(docPath);
+      // Check if doc exists and doc.data is not null
+      if (exists(docPath) && doc.data != null) {
+        return doc.data;
+      }
+      return null;
+    }
+
+    // Users:
+    // - Can create their own user document.
+    // - Can read and update their own user document.
     match /users/{userId} {
+      allow create: if isAuthenticated() &&
+                       request.auth.uid == userId && // User can only create their own doc
+                       request.resource.data.id == userId &&
+                       'email' in request.resource.data && // Ensure email is present
+                       request.resource.data.email == request.auth.token.email;
       allow read, update: if isAuthenticated() && request.auth.uid == userId;
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false; // Deletion not allowed by default
     }
 
-    // PhpFiles collection
-    // Users can create, read, update, and delete their own PHP files.
+    // PhpFiles:
+    // - Authenticated users can create, read, update, delete their own PhpFile documents.
     match /phpFiles/{phpFileId} {
-      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+                       'userId' in request.resource.data && // Ensure userId is in incoming data
+                       request.resource.data.userId == request.auth.uid && // Match with authenticated user
+                       request.resource.data.id == phpFileId; // Ensure document ID matches path ID
+      allow read, update, delete: if isAuthenticated() &&
+                                     resource.data.userId == request.auth.uid; // For existing documents
     }
 
-    // RefactoringTasks collection
+    // RefactoringTasks:
+    // - Authenticated users can create tasks linked to their PhpFiles.
+    // - Can read, update, delete tasks if they own the linked PhpFile.
     match /refactoringTasks/{taskId} {
-      // Checks if the authenticated user owns the PHP file associated with the task.
-      function isTaskOwner() {
-        let phpFileId = (request.method == 'create' ? request.resource.data.phpFileId : resource.data.phpFileId);
-        if (phpFileId == null) {
-          return false;
-        }
-        let phpFileDoc = get(/databases/$(database)/documents/phpFiles/$(phpFileId));
-        return phpFileDoc.exists && phpFileDoc.data.userId == request.auth.uid;
-      }
-      allow read, update, delete: if isAuthenticated() && isTaskOwner();
-      allow create: if isAuthenticated() && isTaskOwner();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.id == taskId && // Check own ID first
+                       'phpFileId' in request.resource.data && // Ensure phpFileId is present
+                       request.resource.data.phpFileId != null && // Ensure it's not null
+                       let phpFileDocData = getDocData(/databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId));
+                       phpFileDocData != null && // Ensure linked PhpFile data exists
+                       'userId' in phpFileDocData && // Ensure userId field exists in PhpFile
+                       phpFileDocData.userId == request.auth.uid; // Check ownership of PhpFile
+      allow read, update, delete: if isAuthenticated() &&
+                                     'phpFileId' in resource.data && // Ensure phpFileId is in existing doc
+                                     resource.data.phpFileId != null &&
+                                     let phpFileDocData = getDocData(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId));
+                                     phpFileDocData != null &&
+                                     'userId' in phpFileDocData &&
+                                     phpFileDocData.userId == request.auth.uid;
     }
 
-    // CompatibilityReports collection
+    // CompatibilityReports:
+    // - Authenticated users can create reports linked to their RefactoringTasks.
+    // - Can read, update, delete reports if they own the linked PhpFile (via RefactoringTask).
     match /compatibilityReports/{reportId} {
-      // Checks if the authenticated user owns the PHP file associated with the report (via the refactoring task).
-      function isReportOwnerViaTask() {
-        let refactoringTaskId = (request.method == 'create' ? request.resource.data.refactoringTaskId : resource.data.refactoringTaskId);
-        if (refactoringTaskId == null) {
-          return false;
-        }
-        let taskDoc = get(/databases/$(database)/documents/refactoringTasks/$(refactoringTaskId));
-        if (!taskDoc.exists || taskDoc.data.phpFileId == null) {
-          return false;
-        }
-        let phpFileDoc = get(/databases/$(database)/documents/phpFiles/$(taskDoc.data.phpFileId));
-        return phpFileDoc.exists && phpFileDoc.data.userId == request.auth.uid;
-      }
-      allow read, update, delete: if isAuthenticated() && isReportOwnerViaTask();
-      allow create: if isAuthenticated() && isReportOwnerViaTask();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.id == reportId && // Check own ID first
+                       'refactoringTaskId' in request.resource.data && // Ensure refactoringTaskId is present
+                       request.resource.data.refactoringTaskId != null &&
+                       let taskDocData = getDocData(/databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId));
+                       taskDocData != null && // Ensure linked Task data exists
+                       'phpFileId' in taskDocData && // Ensure phpFileId field exists in Task
+                       taskDocData.phpFileId != null &&
+                       let phpFileDocData = getDocData(/databases/$(database)/documents/phpFiles/$(taskDocData.phpFileId));
+                       phpFileDocData != null && // Ensure linked PhpFile data exists
+                       'userId' in phpFileDocData && // Ensure userId field exists in PhpFile
+                       phpFileDocData.userId == request.auth.uid; // Check ownership of PhpFile
+      allow read, update, delete: if isAuthenticated() &&
+                                     'refactoringTaskId' in resource.data && // Ensure refactoringTaskId is in existing doc
+                                     resource.data.refactoringTaskId != null &&
+                                     let taskDocData = getDocData(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId));
+                                     taskDocData != null &&
+                                     'phpFileId' in taskDocData &&
+                                     taskDocData.phpFileId != null &&
+                                     let phpFileDocData = getDocData(/databases/$(database)/documents/phpFiles/$(taskDocData.phpFileId));
+                                     phpFileDocData != null &&
+                                     'userId' in phpFileDocData &&
+                                     phpFileDocData.userId == request.auth.uid;
     }
 
-    // CloudBucketScans collection
-    // Users can create, read, update, and delete their own bucket scans.
+    // CloudBucketScans:
+    // - Authenticated users can create, read, update, delete their own CloudBucketScan documents.
     match /cloudBucketScans/{scanId} {
-      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+                       'userId' in request.resource.data && // Ensure userId is in incoming data
+                       request.resource.data.userId == request.auth.uid && // Match with authenticated user
+                       request.resource.data.id == scanId; // Ensure document ID matches path ID
+      allow read, update, delete: if isAuthenticated() &&
+                                     resource.data.userId == request.auth.uid; // For existing documents
     }
   }
 }
