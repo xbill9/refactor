@@ -1,86 +1,67 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if the user is authenticated
-    function isSignedIn() {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to check if the requested user ID matches the authenticated user ID
-    function isRequestingOwnData(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // --- Users Collection ---
+    // Users collection
+    // Users can create their own user document, and read/update their own.
     match /users/{userId} {
-      // Allow read access to authenticated users for their own profiles
-      allow get: if isSignedIn() && isRequestingOwnData(userId);
-
-      // Allow write access to authenticated users for their own profiles
-      allow create, update: if isSignedIn() && isRequestingOwnData(userId);
-
-      //Prevent deletion of user profiles
-      allow delete: if false;
+      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // --- PhpFiles Collection ---
+    // PhpFiles collection
+    // Users can create, read, update, and delete their own PHP files.
     match /phpFiles/{phpFileId} {
-      // Allow read access only to the user who owns the file
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-
-      // Allow create access to authenticated users.  Enforce userId on create.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-
-      // Allow update access only to the user who owns the file
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-
-       // Allow delete access only to the user who owns the file
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
-    // --- RefactoringTasks Collection ---
-    match /refactoringTasks/{refactoringTaskId} {
-      // Allow read access only to the user who owns the associated phpFile (ensure phpFile exists and is owned by the user)
-      allow get: if isSignedIn() && exists(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow create access to authenticated users (ensure phpFile exists and is owned by the user)
-      allow create: if isSignedIn() && exists(/databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow update access only to the user who owns the associated phpFile
-      allow update: if isSignedIn() && exists(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow delete access only to the user who owns the associated phpFile
-      allow delete: if isSignedIn() && exists(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId)).data.userId == request.auth.uid;
+    // RefactoringTasks collection
+    match /refactoringTasks/{taskId} {
+      // Checks if the authenticated user owns the PHP file associated with the task.
+      function isTaskOwner() {
+        let phpFileId = (request.method == 'create' ? request.resource.data.phpFileId : resource.data.phpFileId);
+        if (phpFileId == null) {
+          return false;
+        }
+        let phpFileDoc = get(/databases/$(database)/documents/phpFiles/$(phpFileId));
+        return phpFileDoc.exists && phpFileDoc.data.userId == request.auth.uid;
+      }
+      allow read, update, delete: if isAuthenticated() && isTaskOwner();
+      allow create: if isAuthenticated() && isTaskOwner();
     }
 
-    // --- CompatibilityReports Collection ---
-    match /compatibilityReports/{compatibilityReportId} {
-      // Allow read access only to the user who owns the associated refactoringTask (ensure refactoringTask exists, phpFile exists and is owned by the user)
-      allow get: if isSignedIn() && exists(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)) && exists(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow create access to authenticated users (ensure refactoringTask exists and phpFile is owned by the user)
-      allow create: if isSignedIn() && exists(/databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId)) && exists(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId)).data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId)).data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow update access only to the user who owns the associated refactoringTask
-      allow update: if isSignedIn() && exists(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)) && exists(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)).data.userId == request.auth.uid;
-
-      // Allow delete access only to the user who owns the associated refactoringTask
-      allow delete: if isSignedIn() && exists(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)) && exists(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)) && get(/databases/$(database)/documents/phpFiles/$(get(/databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId)).data.phpFileId)).data.userId == request.auth.uid;
+    // CompatibilityReports collection
+    match /compatibilityReports/{reportId} {
+      // Checks if the authenticated user owns the PHP file associated with the report (via the refactoring task).
+      function isReportOwnerViaTask() {
+        let refactoringTaskId = (request.method == 'create' ? request.resource.data.refactoringTaskId : resource.data.refactoringTaskId);
+        if (refactoringTaskId == null) {
+          return false;
+        }
+        let taskDoc = get(/databases/$(database)/documents/refactoringTasks/$(refactoringTaskId));
+        if (!taskDoc.exists || taskDoc.data.phpFileId == null) {
+          return false;
+        }
+        let phpFileDoc = get(/databases/$(database)/documents/phpFiles/$(taskDoc.data.phpFileId));
+        return phpFileDoc.exists && phpFileDoc.data.userId == request.auth.uid;
+      }
+      allow read, update, delete: if isAuthenticated() && isReportOwnerViaTask();
+      allow create: if isAuthenticated() && isReportOwnerViaTask();
     }
 
-    // --- CloudBucketScans Collection ---
-    match /cloudBucketScans/{cloudBucketScanId} {
-      // Allow read access only to the user who initiated the scan
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-
-      // Allow create access to authenticated users. Enforce userId on create.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-
-      // Allow update access only to the user who initiated the scan
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-
-      // Allow delete access only to the user who initiated the scan
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    // CloudBucketScans collection
+    // Users can create, read, update, and delete their own bucket scans.
+    match /cloudBucketScans/{scanId} {
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
   }
 }
