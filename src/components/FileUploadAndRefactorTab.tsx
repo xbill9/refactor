@@ -19,6 +19,7 @@ import CodeDiffView from './CodeDiffView';
 import { Download, Save, FileText, Cloud, Loader2, UploadCloud } from 'lucide-react';
 import { PhpIcon } from './icons/PhpIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function FileUploadAndRefactorTab() {
