@@ -1,123 +1,130 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // --- Global Helper Functions ---
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    // Checks if the authenticated user's UID matches the provided userId
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Function to safely get data from a document path
-    // Returns the document data if it exists, otherwise null (or a specific part if field is specified)
-    function getDocData(docPath, field) {
-      let doc = get(docPath);
-      if (!doc.exists) {
-        return null;
-      }
-      if (field != null) {
-        return doc.data[field];
-      }
-      return doc.data;
+    // Checks if the authenticated user owns the resource being accessed (uses resource.data)
+    function isCurrentResourceOwner() {
+      return isAuthenticated() && resource.data != null && request.auth.uid == resource.data.userId;
     }
 
-    // User profiles
+    // Checks if the authenticated user would own the resource being created/updated (uses request.resource.data)
+    function isIncomingResourceOwner() {
+      return isAuthenticated() && request.resource.data != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Safely get document data for use in rules
+    function getDocumentData(docPath) {
+      return get(docPath).data;
+    }
+
+    // --- User Profiles ---
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) &&
+      allow read: if isAuthenticated() && (request.auth.uid == userId);
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == userId &&
                        request.resource.data.id == userId &&
-                       request.resource.data.email is string;
-                       // username is optional
-      allow update: if isOwner(userId) &&
-                       request.resource.data.id == userId &&
-                       request.resource.data.email is string &&
-                       !(request.resource.data.keys().hasAny(['createdAt', 'id'])); // Prevent changing id or createdAt
+                       request.resource.data.email == request.auth.token.email &&
+                       request.resource.data.createdAt == request.time; // Ensure server timestamp on create
+      allow update: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       request.resource.data.id == userId && // ID cannot change
+                       request.resource.data.email == resource.data.email && // Email cannot change
+                       request.resource.data.keys().hasOnly(['id', 'username', 'email', 'createdAt']); // Only username can be changed
+      // No delete for user profiles in this app
     }
 
-    // PHP Files
+    // --- PHP Files ---
     match /phpFiles/{fileId} {
-      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && isCurrentResourceOwner();
       allow create: if isAuthenticated() &&
-                       request.resource.data.userId == request.auth.uid &&
+                       isIncomingResourceOwner() &&
                        request.resource.data.fileName is string &&
                        request.resource.data.fileContent is string &&
-                       request.resource.data.uploadTimestamp is timestamp;
+                       request.resource.data.uploadTimestamp is timestamp; // Client sends actual date string, validated as timestamp
+      allow update: if false; // PHP Files are immutable
+      allow delete: if isAuthenticated() && isCurrentResourceOwner();
     }
 
-    // Refactoring Tasks
+    // --- Refactoring Tasks ---
     match /refactoringTasks/{taskId} {
-      allow read, delete: if isAuthenticated() && getDocData(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId), 'userId') == request.auth.uid;
+      // Helper to check ownership via the linked PHP file
+      function isOwnerViaLinkedPhpFile(phpFileId) {
+        let phpFileDocData = getDocumentData(/databases/$(database)/documents/phpFiles/$(phpFileId));
+        return phpFileDocData != null && isOwner(phpFileDocData.userId);
+      }
+
+      allow read: if isAuthenticated() && isOwnerViaLinkedPhpFile(resource.data.phpFileId);
       allow create: if isAuthenticated() &&
                        request.resource.data.phpFileId is string &&
-                       getDocData(/databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId), 'userId') == request.auth.uid &&
                        request.resource.data.originalCode is string &&
                        request.resource.data.refactoredCode is string &&
                        request.resource.data.refactoringTimestamp is timestamp &&
-                       (request.resource.data.compatibilityReportId == null || request.resource.data.compatibilityReportId is string) &&
-                       (request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
+                       isOwnerViaLinkedPhpFile(request.resource.data.phpFileId);
       allow update: if isAuthenticated() &&
-                       getDocData(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId), 'userId') == request.auth.uid &&
-                       (
-                         (request.resource.data.keys().hasOnly(['compatibilityReportId']) && (request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null) ) ||
-                         (request.resource.data.keys().hasOnly(['cloudStorageUrl']) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) ) ||
-                         (request.resource.data.keys().hasAll(['compatibilityReportId', 'cloudStorageUrl']) && (request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) )
-                       );
+                       isOwnerViaLinkedPhpFile(resource.data.phpFileId) && // Original owner must match
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['compatibilityReportId', 'cloudStorageUrl']) &&
+                       // Type validation for updatable fields if they are present
+                       (!(request.resource.data.keys().has('compatibilityReportId')) || request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null) &&
+                       (!(request.resource.data.keys().has('cloudStorageUrl')) || request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null);
+      allow delete: if isAuthenticated() && isOwnerViaLinkedPhpFile(resource.data.phpFileId);
     }
 
-    // Compatibility Reports
+    // --- Compatibility Reports ---
     match /compatibilityReports/{reportId} {
-      function isTaskOwner() {
-        let taskDocPath = /databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId);
-        let taskData = getDocData(taskDocPath, null); // Get the whole task document data
-        if (taskData == null || taskData.phpFileId == null) {
+      // Helper to check ownership via the linked RefactoringTask, then PHP file
+      function isOwnerViaLinkedTask(refactoringTaskId) {
+        let taskDocData = getDocumentData(/databases/$(database)/documents/refactoringTasks/$(refactoringTaskId));
+        // Need to define isOwnerViaLinkedPhpFile globally or pass it around correctly if used here.
+        // For simplicity, let's re-evaluate ownership chain for report.
+        if (taskDocData == null || taskDocData.phpFileId == null) {
           return false;
         }
-        let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(taskData.phpFileId);
-        return getDocData(phpFileDocPath, 'userId') == request.auth.uid;
+        let phpFileDocData = getDocumentData(/databases/$(database)/documents/phpFiles/$(taskDocData.phpFileId));
+        return phpFileDocData != null && isOwner(phpFileDocData.userId);
       }
 
-      function isTaskOwnerForCreate() {
-        let taskDocPath = /databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId);
-        let taskData = getDocData(taskDocPath, null);
-         if (taskData == null || taskData.phpFileId == null) {
-          return false;
-        }
-        let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(taskData.phpFileId);
-        return getDocData(phpFileDocPath, 'userId') == request.auth.uid;
-      }
-
-      allow read, delete: if isAuthenticated() && isTaskOwner();
+      allow read: if isAuthenticated() && isOwnerViaLinkedTask(resource.data.refactoringTaskId);
       allow create: if isAuthenticated() &&
                        request.resource.data.refactoringTaskId is string &&
-                       isTaskOwnerForCreate() &&
                        request.resource.data.reportContent is string &&
                        request.resource.data.generationTimestamp is timestamp &&
-                       (request.resource.data.pdfUrl == null || request.resource.data.pdfUrl is string) &&
-                       (request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
-      allow update: if isAuthenticated() && isTaskOwner() &&
-                      (
-                        (request.resource.data.keys().hasOnly(['pdfUrl']) && (request.resource.data.pdfUrl is string || request.resource.data.pdfUrl == null)) ||
-                        (request.resource.data.keys().hasOnly(['cloudStorageUrl']) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null)) ||
-                        (request.resource.data.keys().hasAll(['pdfUrl', 'cloudStorageUrl']) && (request.resource.data.pdfUrl is string || request.resource.data.pdfUrl == null) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) )
-                      );
+                       isOwnerViaLinkedTask(request.resource.data.refactoringTaskId);
+      allow update: if isAuthenticated() &&
+                       isOwnerViaLinkedTask(resource.data.refactoringTaskId) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pdfUrl', 'cloudStorageUrl']) &&
+                       (!(request.resource.data.keys().has('pdfUrl')) || request.resource.data.pdfUrl is string || request.resource.data.pdfUrl == null) &&
+                       (!(request.resource.data.keys().has('cloudStorageUrl')) || request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null);
+      allow delete: if isAuthenticated() && isOwnerViaLinkedTask(resource.data.refactoringTaskId);
     }
 
-    // Cloud Bucket Scans
+    // --- Cloud Bucket Scans ---
     match /cloudBucketScans/{scanId} {
-      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && isCurrentResourceOwner();
       allow create: if isAuthenticated() &&
-                       request.resource.data.userId == request.auth.uid &&
+                       isIncomingResourceOwner() &&
                        request.resource.data.bucketName is string &&
-                       (request.resource.data.directoryPath == null || request.resource.data.directoryPath is string) &&
+                       // directoryPath is optional, check if present before type check
+                       (!(request.resource.data.keys().has('directoryPath')) || request.resource.data.directoryPath is string || request.resource.data.directoryPath == null) &&
                        request.resource.data.scanTimestamp is timestamp &&
                        request.resource.data.phpFileIds is list &&
                        request.resource.data.recursiveScan is bool;
+      allow update: if isAuthenticated() &&
+                       isCurrentResourceOwner() && // Check ownership of existing resource
+                       request.resource.data.userId == resource.data.userId && // userId must not change
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phpFileIds']) &&
+                       request.resource.data.phpFileIds is list;
+      allow delete: if isAuthenticated() && isCurrentResourceOwner();
     }
   }
 }
-
