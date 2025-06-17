@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { BucketScanFormSchema, type BucketScanFormValues, type CloudBucketScan } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
