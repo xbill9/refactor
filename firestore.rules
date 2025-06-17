@@ -9,179 +9,115 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // isOwner checks if the authenticated user's UID matches the provided userId.
-    // Ensures userId is a string before comparison.
     function isOwner(userId) {
-      return isAuthenticated() && userId is string && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Safely retrieves document data. Returns null if doc doesn't exist or data is null.
-    function getDocData(docPath) {
+    // Function to safely get data from a document path
+    // Returns the document data if it exists, otherwise null (or a specific part if field is specified)
+    function getDocData(docPath, field) {
       let doc = get(docPath);
-      if (exists(docPath) && doc.data != null) {
-        return doc.data;
+      if (!doc.exists) {
+        return null;
       }
-      return null;
-    }
-
-    // Validates that all specified fields are present, not null, and are non-empty strings.
-    function validateRequiredStringFields(data, fields) {
-      return fields.every(field ->
-        field in data &&
-        data[field] != null &&
-        data[field] is string &&
-        data[field].size() > 0
-      );
-    }
-
-    // Validates that all specified fields are present, not null, and are timestamps.
-    function validateRequiredTimestampFields(data, fields) {
-      return fields.every(field ->
-        field in data &&
-        data[field] != null &&
-        data[field] is timestamp
-      );
+      if (field != null) {
+        return doc.data[field];
+      }
+      return doc.data;
     }
 
     // User profiles
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || (resource.data != null && resource.data.id == request.auth.uid));
-      allow create: if
-        isAuthenticated() &&
-        request.auth.uid == userId && // userId in path is the auth uid
-        ('id' in request.resource.data && request.resource.data.id == userId) && // 'id' field must match
-        ('email' in request.resource.data && request.resource.data.email is string && request.resource.data.email == request.auth.token.email) &&
-        (!('username' in request.resource.data) || (request.resource.data.username is string)); // username is optional
-      allow update: if
-        isAuthenticated() &&
-        request.auth.uid == userId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username']) &&
-        (!('username' in request.resource.data) || (request.resource.data.username is string));
-      allow delete: if false; // Generally, don't allow user deletion from client
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) &&
+                       request.resource.data.id == userId &&
+                       request.resource.data.email is string;
+                       // username is optional
+      allow update: if isOwner(userId) &&
+                       request.resource.data.id == userId &&
+                       request.resource.data.email is string &&
+                       !(request.resource.data.keys().hasAny(['createdAt', 'id'])); // Prevent changing id or createdAt
     }
 
     // PHP Files
     match /phpFiles/{fileId} {
-      allow read, delete: if isAuthenticated() && resource.data != null && isOwner(resource.data.userId);
-      allow create: if
-        isAuthenticated() &&
-        // userId checks
-        'userId' in request.resource.data &&
-        request.resource.data.userId is string && // Ensures it's a string before comparison
-        request.resource.data.userId == request.auth.uid &&
-        // fileName checks
-        'fileName' in request.resource.data &&
-        request.resource.data.fileName is string &&
-        request.resource.data.fileName.size() > 0 &&
-        // fileContent checks
-        'fileContent' in request.resource.data &&
-        request.resource.data.fileContent is string &&
-        request.resource.data.fileContent.size() > 0 &&
-        // uploadTimestamp checks
-        'uploadTimestamp' in request.resource.data &&
-        request.resource.data.uploadTimestamp is timestamp;
-      allow update: if false; // PHP files are immutable after creation
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.fileName is string &&
+                       request.resource.data.fileContent is string &&
+                       request.resource.data.uploadTimestamp is timestamp;
     }
 
     // Refactoring Tasks
     match /refactoringTasks/{taskId} {
-      function isTaskOwner() {
-        let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(resource.data.phpFileId);
-        let phpFileData = getDocData(phpFileDocPath);
-        return phpFileData != null && isOwner(phpFileData.userId);
-      }
-      function isCreatingTaskOwner() {
-        let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId);
-        let phpFileData = getDocData(phpFileDocPath);
-        return phpFileData != null && isOwner(phpFileData.userId);
-      }
-
-      allow read, delete: if isAuthenticated() && isTaskOwner();
-      allow create: if
-        isAuthenticated() &&
-        'phpFileId' in request.resource.data && request.resource.data.phpFileId is string &&
-        isCreatingTaskOwner() &&
-        validateRequiredStringFields(request.resource.data, ['originalCode', 'refactoredCode']) &&
-        validateRequiredTimestampFields(request.resource.data, ['refactoringTimestamp']) &&
-        (!('compatibilityReportId' in request.resource.data) || request.resource.data.compatibilityReportId == null || request.resource.data.compatibilityReportId is string) &&
-        (!('cloudStorageUrl' in request.resource.data) || request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
-
-      allow update: if
-        isAuthenticated() &&
-        isTaskOwner() &&
-        (
-          ( // Case 1: Updating compatibilityReportId
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['compatibilityReportId']) &&
-            ('compatibilityReportId' in request.resource.data && (request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null))
-          ) ||
-          ( // Case 2: Updating cloudStorageUrl
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cloudStorageUrl']) &&
-            ('cloudStorageUrl' in request.resource.data && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null))
-          )
-        );
+      allow read, delete: if isAuthenticated() && getDocData(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId), 'userId') == request.auth.uid;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.phpFileId is string &&
+                       getDocData(/databases/$(database)/documents/phpFiles/$(request.resource.data.phpFileId), 'userId') == request.auth.uid &&
+                       request.resource.data.originalCode is string &&
+                       request.resource.data.refactoredCode is string &&
+                       request.resource.data.refactoringTimestamp is timestamp &&
+                       (request.resource.data.compatibilityReportId == null || request.resource.data.compatibilityReportId is string) &&
+                       (request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
+      allow update: if isAuthenticated() &&
+                       getDocData(/databases/$(database)/documents/phpFiles/$(resource.data.phpFileId), 'userId') == request.auth.uid &&
+                       (
+                         (request.resource.data.keys().hasOnly(['compatibilityReportId']) && (request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null) ) ||
+                         (request.resource.data.keys().hasOnly(['cloudStorageUrl']) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) ) ||
+                         (request.resource.data.keys().hasAll(['compatibilityReportId', 'cloudStorageUrl']) && (request.resource.data.compatibilityReportId is string || request.resource.data.compatibilityReportId == null) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) )
+                       );
     }
 
     // Compatibility Reports
     match /compatibilityReports/{reportId} {
-      function isReportOwner() {
+      function isTaskOwner() {
         let taskDocPath = /databases/$(database)/documents/refactoringTasks/$(resource.data.refactoringTaskId);
-        let taskData = getDocData(taskDocPath);
-        if (taskData == null || !('phpFileId' in taskData) || !(taskData.phpFileId is string)) return false;
+        let taskData = getDocData(taskDocPath, null); // Get the whole task document data
+        if (taskData == null || taskData.phpFileId == null) {
+          return false;
+        }
         let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(taskData.phpFileId);
-        let phpFileData = getDocData(phpFileDocPath);
-        return phpFileData != null && isOwner(phpFileData.userId);
+        return getDocData(phpFileDocPath, 'userId') == request.auth.uid;
       }
-      function isCreatingReportOwner() {
+
+      function isTaskOwnerForCreate() {
         let taskDocPath = /databases/$(database)/documents/refactoringTasks/$(request.resource.data.refactoringTaskId);
-        let taskData = getDocData(taskDocPath);
-        if (taskData == null || !('phpFileId' in taskData) || !(taskData.phpFileId is string)) return false;
+        let taskData = getDocData(taskDocPath, null);
+         if (taskData == null || taskData.phpFileId == null) {
+          return false;
+        }
         let phpFileDocPath = /databases/$(database)/documents/phpFiles/$(taskData.phpFileId);
-        let phpFileData = getDocData(phpFileDocPath);
-        return phpFileData != null && isOwner(phpFileData.userId);
+        return getDocData(phpFileDocPath, 'userId') == request.auth.uid;
       }
 
-      allow read, delete: if isAuthenticated() && isReportOwner();
-      allow create: if
-        isAuthenticated() &&
-        'refactoringTaskId' in request.resource.data && request.resource.data.refactoringTaskId is string &&
-        isCreatingReportOwner() &&
-        validateRequiredStringFields(request.resource.data, ['reportContent']) &&
-        validateRequiredTimestampFields(request.resource.data, ['generationTimestamp']) &&
-        (!('pdfUrl' in request.resource.data) || request.resource.data.pdfUrl == null || request.resource.data.pdfUrl is string) &&
-        (!('cloudStorageUrl' in request.resource.data) || request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
-
-      allow update: if
-        isAuthenticated() &&
-        isReportOwner() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cloudStorageUrl']) &&
-        ('cloudStorageUrl' in request.resource.data && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null));
+      allow read, delete: if isAuthenticated() && isTaskOwner();
+      allow create: if isAuthenticated() &&
+                       request.resource.data.refactoringTaskId is string &&
+                       isTaskOwnerForCreate() &&
+                       request.resource.data.reportContent is string &&
+                       request.resource.data.generationTimestamp is timestamp &&
+                       (request.resource.data.pdfUrl == null || request.resource.data.pdfUrl is string) &&
+                       (request.resource.data.cloudStorageUrl == null || request.resource.data.cloudStorageUrl is string);
+      allow update: if isAuthenticated() && isTaskOwner() &&
+                      (
+                        (request.resource.data.keys().hasOnly(['pdfUrl']) && (request.resource.data.pdfUrl is string || request.resource.data.pdfUrl == null)) ||
+                        (request.resource.data.keys().hasOnly(['cloudStorageUrl']) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null)) ||
+                        (request.resource.data.keys().hasAll(['pdfUrl', 'cloudStorageUrl']) && (request.resource.data.pdfUrl is string || request.resource.data.pdfUrl == null) && (request.resource.data.cloudStorageUrl is string || request.resource.data.cloudStorageUrl == null) )
+                      );
     }
 
     // Cloud Bucket Scans
     match /cloudBucketScans/{scanId} {
-      allow read, delete: if isAuthenticated() && resource.data != null && isOwner(resource.data.userId);
-      allow create: if
-        isAuthenticated() &&
-        // userId checks
-        'userId' in request.resource.data &&
-        request.resource.data.userId is string && // Ensures it's a string before comparison
-        request.resource.data.userId == request.auth.uid &&
-        // bucketName checks
-        'bucketName' in request.resource.data &&
-        request.resource.data.bucketName is string &&
-        request.resource.data.bucketName.size() > 0 &&
-        // scanTimestamp checks
-        'scanTimestamp' in request.resource.data &&
-        request.resource.data.scanTimestamp is timestamp &&
-        // phpFileIds checks (mocked as empty array, actual population would be server-side)
-        'phpFileIds' in request.resource.data &&
-        request.resource.data.phpFileIds is list &&
-        // recursiveScan checks
-        'recursiveScan' in request.resource.data &&
-        request.resource.data.recursiveScan is bool;
-      allow update: if false; // Scans are immutable after creation
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.bucketName is string &&
+                       (request.resource.data.directoryPath == null || request.resource.data.directoryPath is string) &&
+                       request.resource.data.scanTimestamp is timestamp &&
+                       request.resource.data.phpFileIds is list &&
+                       request.resource.data.recursiveScan is bool;
     }
   }
 }
 
-    
