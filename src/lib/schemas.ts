@@ -85,3 +85,11 @@ export const RegisterFormSchema = z.object({
   path: ["confirmPassword"],
 });
 export type RegisterFormValues = z.infer<typeof RegisterFormSchema>;
+
+export const AdvancedConfigFormSchema = z.object({
+  model: z.string().min(1, "Please select a model."),
+  temperature: z.number().min(0).max(2).default(0.7), // Adjusted max to 2 as per some models
+  topP: z.number().min(0).max(1).default(0.9),
+  customInstructions: z.string().optional(),
+});
+export type AdvancedConfigFormValues = z.infer<typeof AdvancedConfigFormSchema>;
