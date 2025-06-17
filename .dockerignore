@@ -1,0 +1,52 @@
+# Dockerignore file
+
+# Git files
+.git
+.gitignore
+
+# Node modules - these are handled within Docker stages
+node_modules
+
+# Next.js build output directory - handled within Docker stages
+.next
+
+# Development specific files & logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment files (if they contain secrets or local-only configs)
+# For local Docker, you might mount a .env file or pass variables at runtime.
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!/.env.example # You might want to include an example env file
+
+# Docker specific files (don't include themselves in the build context)
+Dockerfile
+.dockerignore
+
+# Other project files not needed in the image
+README.md
+# Add any other project-specific files or folders to ignore
+# e.g., documentation, test coverage reports if not needed in the image
+apphosting.yaml
+firebase.json
+firestore.rules
+firestore.indexes.json
+components.json
+# Keep src/ and public/ as they are needed for the build
+# Keep package.json, package-lock.json, next.config.ts, tsconfig.json
