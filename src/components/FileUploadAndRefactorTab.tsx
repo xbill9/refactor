@@ -16,7 +16,7 @@ import { generateCompatibilityReport as generateAiCompatibilityReport } from '@/
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import CodeDiffView from './CodeDiffView';
-import { Download, Save, FileText, Cloud, Loader2, UploadCloud } from 'lucide-react';
+import { Download, Save, FileText, Cloud, Loader2, UploadCloud, FileCode } from 'lucide-react'; // Added FileCode
 import { PhpIcon } from './icons/PhpIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -131,6 +131,19 @@ export default function FileUploadAndRefactorTab() {
     }
   };
 
+  const handleDownloadRefactoredFile = () => {
+    if (!currentTask || !currentPhpFile) return;
+    const blob = new Blob([currentTask.refactoredCode], { type: 'text/php;charset=utf-8' });
+    const refactoredFileName = currentPhpFile.fileName.replace('.php', '_refactored.php');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = refactoredFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: 'Refactored File Downloaded', description: `${refactoredFileName} saved.` });
+  };
+
   const handleDownloadReport = () => {
     if (!currentReport || !fileName) return;
     const blob = new Blob([currentReport.reportContent], { type: 'text/plain;charset=utf-8' });
@@ -240,6 +253,9 @@ export default function FileUploadAndRefactorTab() {
                 <pre className="font-code text-sm whitespace-pre-wrap">{currentReport.reportContent}</pre>
               </ScrollArea>
               <div className="mt-6 flex flex-wrap gap-4">
+                <Button onClick={handleDownloadRefactoredFile} variant="outline">
+                  <FileCode className="mr-2 h-4 w-4" /> Download Refactored File (.php)
+                </Button>
                 <Button onClick={handleDownloadReport} variant="outline">
                   <Download className="mr-2 h-4 w-4" /> Download Report (.txt)
                 </Button>
