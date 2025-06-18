@@ -3,23 +3,18 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BucketScanFormSchema, type BucketScanFormValues, type CloudBucketScan } from '@/lib/schemas';
+import { BucketScanFormSchema, type BucketScanFormValues } from '@/lib/schemas'; // CloudBucketScan type removed as it's not persisted
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useCollection } from '@/firebase'; // useUser removed
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, query, orderBy } from 'firebase/firestore'; // serverTimestamp, where removed
-import { HardDriveDownload, Search, Loader2, ListChecks, FolderGit2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { format } from 'date-fns';
+// Firestore related imports (useFirestore, useCollection, addDocumentNonBlocking, collection, doc, query, orderBy) removed
+import { HardDriveDownload, Search, Loader2, ListChecks } from 'lucide-react'; // FolderGit2 removed
+// ScrollArea and format removed as history is gone
 
 export default function BucketScanTab() {
-  // const { user } = useUser(); // user removed
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [isScanning, setIsScanning] = useState(false);
 
@@ -32,49 +27,34 @@ export default function BucketScanTab() {
     },
   });
   
-  // Updated query to fetch all scans, as userId is removed
-  const allScansQuery = React.useMemo(() => {
-    if (!firestore) return null;
-    return query(
-        collection(firestore, 'cloudBucketScans'), 
-        orderBy('scanTimestamp', 'desc')
-    );
-  }, [firestore]);
-
-  const { data: scans, isLoading: isLoadingScans } = useCollection<CloudBucketScan>(allScansQuery);
+  // Scan history and related query/loading state removed
 
   const onSubmit = async (data: BucketScanFormValues) => {
-    // if (!user) { // Auth check removed
-    //   toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in.' });
-    //   return;
-    // }
-     if (!firestore) {
-       toast({ variant: 'destructive', title: 'Firestore Error', description: 'Firestore service is not available.' });
-       return;
-    }
-
     setIsScanning(true);
     try {
-      const scanId = doc(collection(firestore, 'cloudBucketScans')).id;
-      const newScan: Omit<CloudBucketScan, 'id'> = { // userId removed
-        // userId: user.uid,
-        bucketName: data.bucketName,
-        directoryPath: data.directoryPath || '',
-        scanTimestamp: new Date().toISOString(),
-        phpFileIds: [], 
-        recursiveScan: data.recursiveScan,
-      };
+      // Simulate scan initiation
+      // const scanId = crypto.randomUUID(); // No longer need to generate ID for Firestore
+      // const newScan: Omit<CloudBucketScan, 'id'> = { // No longer creating CloudBucketScan object
+      //   bucketName: data.bucketName,
+      //   directoryPath: data.directoryPath || '',
+      //   scanTimestamp: new Date().toISOString(),
+      //   phpFileIds: [], 
+      //   recursiveScan: data.recursiveScan,
+      // };
       
-      addDocumentNonBlocking(collection(firestore, 'cloudBucketScans'), { ...newScan, id: scanId });
+      // Removed: addDocumentNonBlocking(collection(firestore, 'cloudBucketScans'), { ...newScan, id: scanId });
+
+      // Simulate API call delay for mock scan
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       toast({
         title: 'Bucket Scan Initiated (Mock)',
-        description: `Scan for bucket '${data.bucketName}' has been queued. This is a mock process; no actual scanning will occur.`,
+        description: `Mock scan for bucket '${data.bucketName}' has been queued. This is a mock process; no actual scanning will occur and no history is saved.`,
       });
       form.reset();
     } catch (error: any) {
-      console.error('Scan initiation error:', error);
-      toast({ variant: 'destructive', title: 'Scan Error', description: error.message || 'Failed to initiate scan.' });
+      console.error('Mock Scan initiation error:', error);
+      toast({ variant: 'destructive', title: 'Scan Error (Mock)', description: error.message || 'Failed to initiate mock scan.' });
     } finally {
       setIsScanning(false);
     }
@@ -89,7 +69,7 @@ export default function BucketScanTab() {
           </CardTitle>
           <CardDescription>
             Specify a Google Cloud Storage bucket to scan for PHP files. 
-            (Note: Actual scanning and refactoring from bucket is a mock feature.)
+            (Note: Actual scanning, refactoring, and history from bucket is a mock feature.)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -140,13 +120,13 @@ export default function BucketScanTab() {
                         Recursive Scan
                       </FormLabel>
                       <FormDescription>
-                        Scan all subdirectories within the specified path.
+                        Scan all subdirectories within the specified path (mock).
                       </FormDescription>
                     </div>
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isScanning}> {/* Removed !user check */}
+              <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isScanning}>
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                 Start Scan (Mock)
               </Button>
@@ -155,57 +135,20 @@ export default function BucketScanTab() {
         </CardContent>
       </Card>
 
+      {/* Scan History Card Removed */}
       <Card className="w-full shadow-xl">
         <CardHeader>
             <CardTitle className="text-2xl font-headline text-primary flex items-center">
                 <ListChecks className="mr-3 h-7 w-7" /> Scan History
             </CardTitle>
             <CardDescription>
-                Previous bucket scan requests.
+                Scan history is unavailable as database integration has been removed.
             </CardDescription>
         </CardHeader>
         <CardContent>
-            {isLoadingScans && (
-                 <div className="flex justify-center items-center h-32">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                 </div>
-            )}
-            {!isLoadingScans && scans && scans.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No scan history found.</p>
-            )}
-            {!isLoadingScans && scans && scans.length > 0 && (
-                <ScrollArea className="h-[300px] border rounded-md">
-                    <ul className="divide-y divide-border">
-                        {scans.map(scan => (
-                            <li key={scan.id} className="p-4 hover:bg-muted/50 transition-colors">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-primary flex items-center">
-                                            <FolderGit2 className="mr-2 h-5 w-5 text-accent"/>
-                                            {scan.bucketName}
-                                            {scan.directoryPath && <span className="text-sm text-muted-foreground ml-1">/{scan.directoryPath}</span>}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            ID: {scan.id}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm text-muted-foreground">
-                                            {format(new Date(scan.scanTimestamp), "MMM d, yyyy 'at' h:mm a")}
-                                        </p>
-                                        <p className={`text-xs font-medium ${scan.recursiveScan ? 'text-green-600' : 'text-orange-600'}`}>
-                                            {scan.recursiveScan ? 'Recursive' : 'Non-Recursive'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Files found (mock): {scan.phpFileIds.length}
-                                </p>
-                            </li>
-                        ))}
-                    </ul>
-                </ScrollArea>
-            )}
+            <p className="text-muted-foreground text-center py-4">
+                Persistent scan history is not available in this version.
+            </p>
         </CardContent>
       </Card>
     </div>
