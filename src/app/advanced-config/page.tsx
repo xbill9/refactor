@@ -15,7 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Cog } from 'lucide-react';
 
-const AVAILABLE_MODELS = [
+
+export const AVAILABLE_MODELS = [
   { id: 'googleai/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
   { id: 'googleai/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
   { id: 'googleai/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
@@ -23,7 +24,7 @@ const AVAILABLE_MODELS = [
   { id: 'googleai/gemini-2.5-flash-lite-preview-06-17', name: 'Gemini 2.5 Flash Lite Preview' },
 ];
 
-const LOCAL_STORAGE_KEY = 'advancedAiConfig';
+export const LOCAL_STORAGE_KEY = 'advancedAiConfig';
 
 export default function AdvancedConfigPage() {
   const { toast } = useToast();

@@ -19,16 +19,34 @@ export default function HomePage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [selectedModelName, setSelectedModelName] = useState<string>('Loading model...');
 
-
-  // useEffect(() => {
-  //   if (!isUserLoading) {
-  //     if (!user && auth) {
-  //       initiateAnonymousSignIn(auth); 
-  //     }
-  //     setAuthChecked(true);
-  //   }
-  // }, [isUserLoading, user, auth]);
-
+  useEffect(() => {
+    const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedConfigRaw) {
+      try {
+        const savedConfig = JSON.parse(savedConfigRaw) as AdvancedConfigFormValues;
+        if (savedConfig && savedConfig.model) {
+          const modelDetails = AVAILABLE_MODELS.find(m => m.id === savedConfig.model);
+          if (modelDetails) {
+            setSelectedModelName(modelDetails.name);
+          } else {
+            // Model ID from localStorage not found in current AVAILABLE_MODELS
+            // Fallback to the first model in AVAILABLE_MODELS as a sensible default
+            setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+          }
+        } else {
+          // Config saved but no model property, or model property is empty
+          setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+        }
+      } catch (error) {
+        console.error('Failed to parse saved AI config:', error);
+        // Error parsing, fallback to default
+        setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+      }
+    } else {
+      // No config saved yet, use the first model from AVAILABLE_MODELS as default display
+      setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+    }
+  }, []); // Empty dependency array to run only on mount
 
   useEffect(() => {
     const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
