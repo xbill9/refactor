@@ -77,6 +77,35 @@ export default function HomePage() {
     }
   }, []); // Empty dependency array to run only on mount
 
+  useEffect(() => {
+    const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedConfigRaw) {
+      try {
+        const savedConfig = JSON.parse(savedConfigRaw) as AdvancedConfigFormValues;
+        if (savedConfig && savedConfig.model) {
+          const modelDetails = AVAILABLE_MODELS.find(m => m.id === savedConfig.model);
+          if (modelDetails) {
+            setSelectedModelName(modelDetails.name);
+          } else {
+            // Model ID from localStorage not found in current AVAILABLE_MODELS
+            // Fallback to the first model in AVAILABLE_MODELS as a sensible default
+            setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+          }
+        } else {
+          // Config saved but no model property, or model property is empty
+          setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+        }
+      } catch (error) {
+        console.error('Failed to parse saved AI config:', error);
+        // Error parsing, fallback to default
+        setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+      }
+    } else {
+      // No config saved yet, use the first model from AVAILABLE_MODELS as default display
+      setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+    }
+  }, []); // Empty dependency array to run only on mount
+
   if (isUserLoading || !authChecked) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-background p-6 text-center">

@@ -9,8 +9,26 @@ interface FirebaseProviderProps {
 }
 
 export interface FirebaseContextState {
-  areServicesAvailable: boolean;
-  firebaseApp: any | null; // Changed from FirebaseApp to any
+
+  areServicesAvailable: boolean; // True if core services (app, firestore, auth instance) are provided
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null; // The Auth service instance
+  // User authentication state
+  user: User | null;
+  isUserLoading: boolean; // True during initial auth check
+  userError: Error | null; // Error from auth listener
+}
+
+// Return type for useFirebase()
+export interface FirebaseServicesAndUser {
+  firebaseApp: FirebaseApp | null;
+  firestore: Firestore | null;
+  auth: Auth | null;
+  user: User | null;
+  isUserLoading: boolean;
+  userError: Error | null;
+
 }
 
 export interface FirebaseServices {
@@ -47,21 +65,28 @@ export const useFirebase = (): FirebaseServices => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  // if (!context.areServicesAvailable || !context.firebaseApp) {
-  //   // This error might be too strict if we expect Firebase to be optional/removed
-  //   // console.warn('Firebase core services not available. Check FirebaseProvider props.');
-  //   // Return nulls or a structure indicating unavailability
-  //   return { firebaseApp: null };
-  // }
-  // For now, let's assume if the context exists, firebaseApp could be null.
-  // The consuming code should check for firebaseApp's existence.
 
   return {
     firebaseApp: context.firebaseApp,
   };
 };
 
-export const useFirebaseApp = (): any | null => { // Changed from FirebaseApp to any | null
+
+/** Hook to access Firebase Auth instance. */
+export const useAuth = (): Auth | null => { // Changed to Auth | null
+  const { auth } = useFirebase();
+  return auth;
+};
+
+/** Hook to access Firestore instance. */
+export const useFirestore = (): Firestore | null => { // Changed to Firestore | null
+  const { firestore } = useFirebase();
+  return firestore;
+};
+
+/** Hook to access Firebase App instance. */
+export const useFirebaseApp = (): FirebaseApp | null => { // Changed to FirebaseApp | null
+
   const { firebaseApp } = useFirebase();
   return firebaseApp;
 };
