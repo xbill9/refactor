@@ -1,7 +1,3 @@
 {
-  "firebase_hosting": {
-    "deploymentHostingUrl": "https://demo-app.web.app"
-  },
-  "cloud_run_deploy": {},
-  "gemini_api": {}
+  "cloud_run_deploy": {}
 }

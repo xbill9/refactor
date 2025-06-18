@@ -1,44 +1,14 @@
 {
   "entities": {
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema",
-      "title": "User",
-      "description": "Represents a user of the PHP Refactor Pro application.",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "username": {
-          "type": "string",
-          "description": "The username of the user."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The email address of the user."
-        }
-      },
-      "required": [
-        "id",
-        "username",
-        "email"
-      ]
-    },
     "PhpFile": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "title": "PhpFile",
-      "description": "Represents a PHP file uploaded for refactoring.",
+      "description": "Represents a PHP file uploaded for refactoring (in-memory representation).",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the PhpFile entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the unique identifier of the user who uploaded the file. (Relationship: User 1:N PhpFile)"
+          "description": "Unique identifier for the PhpFile entity."
         },
         "fileName": {
           "type": "string",
@@ -51,12 +21,11 @@
         "uploadTimestamp": {
           "type": "string",
           "format": "date-time",
-          "description": "The timestamp when the file was uploaded."
+          "description": "The timestamp when the file was processed."
         }
       },
       "required": [
         "id",
-        "userId",
         "fileName",
         "fileContent",
         "uploadTimestamp"
@@ -65,16 +34,20 @@
     "RefactoringTask": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "title": "RefactoringTask",
-      "description": "Represents a refactoring task performed on a PHP file.",
+      "description": "Represents a refactoring task performed on a PHP file (in-memory representation).",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the RefactoringTask entity. The specific format and generation strategy depend on the target database implementation."
+          "description": "Unique identifier for the RefactoringTask entity."
         },
         "phpFileId": {
           "type": "string",
-          "description": "Reference to the unique identifier of the original PhpFile being refactored. (Relationship: PhpFile 1:N RefactoringTask)"
+          "description": "Reference to the unique identifier of the original PhpFile."
+        },
+        "originalCode": {
+          "type": "string",
+          "description": "The original PHP code before refactoring."
         },
         "refactoredCode": {
           "type": "string",
@@ -85,7 +58,7 @@
             "string",
             "null"
           ],
-          "description": "Reference to the unique identifier of the associated CompatibilityReport entity, if generated. (Relationship: RefactoringTask 1:1 CompatibilityReport)"
+          "description": "Reference to the unique identifier of the associated CompatibilityReport entity, if generated."
         },
         "refactoringTimestamp": {
           "type": "string",
@@ -97,12 +70,13 @@
             "string",
             "null"
           ],
-          "description": "The URL of the refactored file saved in Google Cloud Storage, if saved."
+          "description": "Mock URL for cloud storage."
         }
       },
       "required": [
         "id",
         "phpFileId",
+        "originalCode",
         "refactoredCode",
         "refactoringTimestamp"
       ]
@@ -110,16 +84,16 @@
     "CompatibilityReport": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "title": "CompatibilityReport",
-      "description": "Represents a compatibility report generated after refactoring a PHP file.",
+      "description": "Represents a compatibility report generated after refactoring a PHP file (in-memory representation).",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CompatibilityReport entity. The specific format and generation strategy depend on the target database implementation."
+          "description": "Unique identifier for the CompatibilityReport entity."
         },
         "refactoringTaskId": {
           "type": "string",
-          "description": "Reference to the unique identifier of the related RefactoringTask entity. (Relationship: RefactoringTask 1:1 CompatibilityReport)"
+          "description": "Reference to the unique identifier of the related RefactoringTask entity."
         },
         "reportContent": {
           "type": "string",
@@ -135,14 +109,14 @@
             "string",
             "null"
           ],
-          "description": "The URL of the PDF version of the report, if generated."
+          "description": "Mock URL for PDF report."
         },
         "cloudStorageUrl": {
           "type": [
             "string",
             "null"
           ],
-          "description": "The URL of the compatibility report saved in Google Cloud Storage, if saved."
+          "description": "Mock URL for cloud storage."
         }
       },
       "required": [
@@ -155,20 +129,16 @@
     "CloudBucketScan": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "title": "CloudBucketScan",
-      "description": "Represents a scan of a Google Cloud Storage bucket for PHP files to refactor.",
+      "description": "Represents a mock scan of a cloud bucket (in-memory representation).",
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CloudBucketScan entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the unique identifier of the user who initiated the bucket scan. (Relationship: User 1:N CloudBucketScan)"
+          "description": "Unique identifier for the CloudBucketScan entity."
         },
         "bucketName": {
           "type": "string",
-          "description": "The name of the Google Cloud Storage bucket to scan."
+          "description": "The name of the cloud bucket to scan."
         },
         "directoryPath": {
           "type": "string",
@@ -181,20 +151,19 @@
         },
         "phpFileIds": {
           "type": "array",
-          "description": "Array of identifiers for PhpFile entities found during the bucket scan. (Relationship: CloudBucketScan 1:N PhpFile)",
+          "description": "Array of mock identifiers for PhpFile entities found during the bucket scan.",
           "items": {
             "type": "string",
-            "description": "Reference to the unique identifier of a PhpFile entity found during the scan."
+            "description": "Mock identifier of a PhpFile entity found during the scan."
           }
         },
         "recursiveScan": {
           "type": "boolean",
-          "description": "Whether the file should be recursivley scanned."
+          "description": "Whether the file should be recursively scanned."
         }
       },
       "required": [
         "id",
-        "userId",
         "bucketName",
         "scanTimestamp",
         "phpFileIds",
@@ -202,95 +171,6 @@
       ]
     }
   },
-  "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
-  },
-  "firestore": {
-    "structure": [
-      {
-        "definition": {
-          "description": "Collection containing user profile documents.",
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the user.",
-              "name": "userId"
-            }
-          ]
-        },
-        "path": "/users/{userId}"
-      },
-      {
-        "definition": {
-          "description": "Collection containing PHP file documents.",
-          "entityName": "PhpFile",
-          "schema": {
-            "$ref": "#/backend/entities/PhpFile"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the PHP file.",
-              "name": "phpFileId"
-            }
-          ]
-        },
-        "path": "/phpFiles/{phpFileId}"
-      },
-      {
-        "definition": {
-          "description": "Collection containing refactoring task documents.",
-          "entityName": "RefactoringTask",
-          "schema": {
-            "$ref": "#/backend/entities/RefactoringTask"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the refactoring task.",
-              "name": "refactoringTaskId"
-            }
-          ]
-        },
-        "path": "/refactoringTasks/{refactoringTaskId}"
-      },
-      {
-        "definition": {
-          "description": "Collection containing compatibility report documents.",
-          "entityName": "CompatibilityReport",
-          "schema": {
-            "$ref": "#/backend/entities/CompatibilityReport"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the compatibility report.",
-              "name": "compatibilityReportId"
-            }
-          ]
-        },
-        "path": "/compatibilityReports/{compatibilityReportId}"
-      },
-      {
-        "definition": {
-          "description": "Collection containing cloud bucket scan documents.",
-          "entityName": "CloudBucketScan",
-          "schema": {
-            "$ref": "#/backend/entities/CloudBucketScan"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the cloud bucket scan.",
-              "name": "cloudBucketScanId"
-            }
-          ]
-        },
-        "path": "/cloudBucketScans/{cloudBucketScanId}"
-      }
-    ],
-    "reasoning": "Based on the entities provided, the following Firestore collections are recommended:\n\n*   **users**: Stores user profile data. Document ID will be the user's unique ID.\n*   **phpFiles**: Stores PHP file metadata and content. Each document represents a file uploaded by a user.\n*   **refactoringTasks**: Stores information about each refactoring task performed on a PHP file.\n*   **compatibilityReports**: Stores compatibility reports generated after refactoring.\n*   **cloudBucketScans**: Stores metadata related to cloud bucket scans initiated by users.\n\nThe relationships between entities are maintained through document references within the respective collections, using the provided `userId`, `phpFileId`, `refactoringTaskId`, and `cloudBucketScanId` fields.  There will be no subcollections."
-  }
+  "auth": null,
+  "firestore": null
 }
