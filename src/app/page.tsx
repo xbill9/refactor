@@ -1,11 +1,11 @@
 'use client';
 
-import React from 'react'; // Removed useEffect, useState
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// import { useUser, useAuth, initiateAnonymousSignIn } from '@/firebase'; // Auth related imports removed
+import { useUser, useAuth } from '@/firebase/provider';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 import FileUploadAndRefactorTab from '@/components/FileUploadAndRefactorTab';
 import BucketScanTab from '@/components/BucketScanTab';
-
 import { Loader2, FileUp, HardDriveDownload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,62 +20,14 @@ export default function HomePage() {
   const [selectedModelName, setSelectedModelName] = useState<string>('Loading model...');
 
   useEffect(() => {
-    const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedConfigRaw) {
-      try {
-        const savedConfig = JSON.parse(savedConfigRaw) as AdvancedConfigFormValues;
-        if (savedConfig && savedConfig.model) {
-          const modelDetails = AVAILABLE_MODELS.find(m => m.id === savedConfig.model);
-          if (modelDetails) {
-            setSelectedModelName(modelDetails.name);
-          } else {
-            // Model ID from localStorage not found in current AVAILABLE_MODELS
-            // Fallback to the first model in AVAILABLE_MODELS as a sensible default
-            setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-          }
-        } else {
-          // Config saved but no model property, or model property is empty
-          setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-        }
-      } catch (error) {
-        console.error('Failed to parse saved AI config:', error);
-        // Error parsing, fallback to default
-        setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+    if (!isUserLoading) {
+      if (!user && auth) {
+        // Only attempt anonymous sign-in if auth service is available and no user
+        initiateAnonymousSignIn(auth);
       }
-    } else {
-      // No config saved yet, use the first model from AVAILABLE_MODELS as default display
-      setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+      setAuthChecked(true); // Mark that auth check and potential anonymous sign-in attempt is done
     }
-  }, []); // Empty dependency array to run only on mount
-
-  useEffect(() => {
-    const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedConfigRaw) {
-      try {
-        const savedConfig = JSON.parse(savedConfigRaw) as AdvancedConfigFormValues;
-        if (savedConfig && savedConfig.model) {
-          const modelDetails = AVAILABLE_MODELS.find(m => m.id === savedConfig.model);
-          if (modelDetails) {
-            setSelectedModelName(modelDetails.name);
-          } else {
-            // Model ID from localStorage not found in current AVAILABLE_MODELS
-            // Fallback to the first model in AVAILABLE_MODELS as a sensible default
-            setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-          }
-        } else {
-          // Config saved but no model property, or model property is empty
-          setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-        }
-      } catch (error) {
-        console.error('Failed to parse saved AI config:', error);
-        // Error parsing, fallback to default
-        setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-      }
-    } else {
-      // No config saved yet, use the first model from AVAILABLE_MODELS as default display
-      setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
-    }
-  }, []); // Empty dependency array to run only on mount
+  }, [isUserLoading, user, auth]);
 
   useEffect(() => {
     const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -116,24 +68,36 @@ export default function HomePage() {
     );
   }
   
-  // if (!user) {
-  //    return (
-  //     <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-background p-6 text-center">
-  //       <Card className="w-full max-w-lg shadow-xl">
-  //           <CardHeader>
-  //               <CardTitle className="text-3xl font-bold text-primary">Welcome to PHP Refactor Pro</CardTitle>
-  //               <CardDescription>
-  //                   Loading application.
-  //               </CardDescription>
-  //           </CardHeader>
-  //           <CardContent className="flex flex-col space-y-4 items-center">
-  //                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-  //                <p className="text-muted-foreground">Initializing...</p>
-  //           </CardContent>
-  //       </Card>
-  //     </div>
-  //   );
-  // }
+  if (!user) {
+    // This state should ideally not be reached for long if anonymous sign-in is working.
+    // It might show briefly or if anonymous sign-in fails.
+     return (
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-background p-6 text-center">
+        <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader>
+                <CardTitle className="text-3xl font-bold text-primary">Welcome to PHP Refactor Pro</CardTitle>
+                <CardDescription>
+                    Please log in or register to use the app. Anonymous sign-in is being attempted.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-4 items-center">
+                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                 <p className="text-muted-foreground">Attempting to sign you in anonymously...</p>
+                 <p className="text-sm text-muted-foreground">If this persists, please check your connection or try logging in manually.</p>
+                <div className="flex space-x-4">
+                    <Button asChild>
+                        <Link href="/login">Login</Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                        <Link href="/register">Register</Link>
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">

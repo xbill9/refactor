@@ -10,17 +10,21 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-// Firestore related imports (useFirestore, addDocumentNonBlocking, updateDocumentNonBlocking, collection, doc) removed
+import { useUser, useFirestore } from '@/firebase';
 import { refactorPhpFile } from '@/ai/flows/refactor-php';
 import { generateCompatibilityReport as generateAiCompatibilityReport } from '@/ai/flows/generate-compatibility-report';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import CodeDiffView from './CodeDiffView';
-import { Download, Save, FileText, Cloud, Loader2, UploadCloud, FileCode } from 'lucide-react'; 
+import { Download, Save, FileText, Cloud, Loader2, UploadCloud, FileCode } from 'lucide-react'; // Added FileCode
 import { PhpIcon } from './icons/PhpIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function FileUploadAndRefactorTab() {
+  const { user } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -45,7 +49,16 @@ export default function FileUploadAndRefactorTab() {
   };
 
   const onSubmit = async (data: PhpFileUploadValues) => {
-    resetState(); 
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to upload files.' });
+      return;
+    }
+    if (!firestore) {
+       toast({ variant: 'destructive', title: 'Firestore Error', description: 'Firestore service is not available.' });
+       return;
+    }
+
+    resetState(); // Reset state before new submission
     setIsProcessing(true);
     setFileName(data.phpFile.name);
 
@@ -53,35 +66,34 @@ export default function FileUploadAndRefactorTab() {
       const fileContent = await data.phpFile.text();
       setProgress(10);
 
-      // 1. Create PhpFile object (in memory)
-      const phpFileId = crypto.randomUUID(); // Simple ID for in-memory object
-      const newPhpFile: PhpFile = {
-        id: phpFileId,
+      // 1. Create PhpFile document
+      const phpFileId = doc(collection(firestore, 'phpFiles')).id;
+      const newPhpFile: Omit<PhpFile, 'id'> = {
+        userId: user.uid,
         fileName: data.phpFile.name,
         fileContent: fileContent,
         uploadTimestamp: new Date().toISOString(),
       };
-      setCurrentPhpFile(newPhpFile);
+      await addDocumentNonBlocking(collection(firestore, 'phpFiles'), { ...newPhpFile, id: phpFileId });
+      setCurrentPhpFile({ ...newPhpFile, id: phpFileId });
       setProgress(20);
-      toast({ title: 'File Processed Locally', description: `${data.phpFile.name} ready for refactoring.` });
+      toast({ title: 'File Uploaded', description: `${data.phpFile.name} uploaded successfully.` });
 
       // 2. Call refactorPhpFile AI flow
       toast({ title: 'Refactoring In Progress...', description: 'AI is working on your PHP code.' });
       const refactorResult = await refactorPhpFile({ phpCode: fileContent });
       setProgress(50);
 
-      // 3. Create RefactoringTask object (in memory)
-      const taskId = crypto.randomUUID();
-      const newRefactoringTaskData: RefactoringTask = {
-        id: taskId,
+      // 3. Create RefactoringTask document
+      const taskId = doc(collection(firestore, 'refactoringTasks')).id;
+      const newRefactoringTaskData: Omit<RefactoringTask, 'id' | 'compatibilityReportId' | 'cloudStorageUrl'> = {
         phpFileId: phpFileId,
         originalCode: fileContent,
         refactoredCode: refactorResult.refactoredCode,
         refactoringTimestamp: new Date().toISOString(),
-        compatibilityReportId: null, // Will be set after report generation
-        cloudStorageUrl: null, // Mock
       };
-      setCurrentTask(newRefactoringTaskData);
+      await addDocumentNonBlocking(collection(firestore, 'refactoringTasks'), { ...newRefactoringTaskData, id: taskId, compatibilityReportId: null, cloudStorageUrl: null });
+      setCurrentTask({ ...newRefactoringTaskData, id: taskId, compatibilityReportId: null, cloudStorageUrl: null });
       setProgress(60);
       toast({ title: 'Refactoring Complete', description: 'PHP code refactored.' });
 
@@ -90,20 +102,20 @@ export default function FileUploadAndRefactorTab() {
       const reportResult = await generateAiCompatibilityReport({ originalCode: fileContent, refactoredCode: refactorResult.refactoredCode });
       setProgress(80);
 
-      // 5. Create CompatibilityReport object (in memory)
-      const reportId = crypto.randomUUID();
-      const newCompatibilityReportData: CompatibilityReport = {
-        id: reportId,
+      // 5. Create CompatibilityReport document
+      const reportId = doc(collection(firestore, 'compatibilityReports')).id;
+      const newCompatibilityReportData: Omit<CompatibilityReport, 'id' | 'pdfUrl' | 'cloudStorageUrl'> = {
         refactoringTaskId: taskId,
         reportContent: `${refactorResult.compatibilityReport}\n\nReasoning:\n${refactorResult.reasoning}\n\nDetailed Report:\n${reportResult.report}`,
         generationTimestamp: new Date().toISOString(),
-        pdfUrl: null, // Mock
-        cloudStorageUrl: null, // Mock
       };
-      setCurrentReport(newCompatibilityReportData);
+      await addDocumentNonBlocking(collection(firestore, 'compatibilityReports'), { ...newCompatibilityReportData, id: reportId, pdfUrl: null, cloudStorageUrl: null });
+      setCurrentReport({ ...newCompatibilityReportData, id: reportId, pdfUrl: null, cloudStorageUrl: null });
       setProgress(90);
-      
-      // Update RefactoringTask with compatibilityReportId (in memory)
+
+      // 6. Update RefactoringTask with compatibilityReportId
+      const taskDocRef = doc(firestore, 'refactoringTasks', taskId);
+      await updateDocumentNonBlocking(taskDocRef, { compatibilityReportId: reportId });
       setCurrentTask(prev => prev ? { ...prev, compatibilityReportId: reportId } : null);
       setProgress(100);
       toast({ title: 'Report Generated', description: 'Compatibility report is ready.' });
@@ -111,10 +123,12 @@ export default function FileUploadAndRefactorTab() {
     } catch (error: any) {
       console.error('Processing error:', error);
       toast({ variant: 'destructive', title: 'Processing Error', description: error.message || 'An unexpected error occurred.' });
-      resetState(); 
+      resetState(); // Reset on error
+    } finally {
+      // Do not set isProcessing to false here if you want to keep showing results.
+      // Reset button will handle clearing results.
+      // setIsProcessing(false); // only if you want to allow new uploads immediately
     }
-    // setIsProcessing should remain true until resetState is called by starting a new refactor
-    // to keep the results visible.
   };
 
   const handleDownloadRefactoredFile = () => {
@@ -144,17 +158,23 @@ export default function FileUploadAndRefactorTab() {
   };
   
   const handleSaveRefactoredToCloud = async () => {
-    if (!currentTask || !currentPhpFile) return;
-    const mockGcsPath = `gs://php-refactor-pro-bucket/refactored_files/${currentPhpFile.fileName}`;
+    if (!currentTask || !firestore) return;
+    // Mock GCS path
+    const mockGcsPath = `gs://php-refactor-pro-bucket/refactored_files/${currentPhpFile?.fileName || 'unknown.php'}`;
+    const taskDocRef = doc(firestore, 'refactoringTasks', currentTask.id);
+    await updateDocumentNonBlocking(taskDocRef, { cloudStorageUrl: mockGcsPath });
     setCurrentTask(prev => prev ? { ...prev, cloudStorageUrl: mockGcsPath } : null);
-    toast({ title: 'Saved to Cloud (Mock)', description: `Mock save to: ${mockGcsPath}. No actual cloud write occurred.` });
+    toast({ title: 'Saved to Cloud (Mock)', description: `Refactored file path: ${mockGcsPath}` });
   };
 
   const handleSaveReportToCloud = async () => {
-    if (!currentReport || !currentPhpFile) return;
-    const mockGcsPath = `gs://php-refactor-pro-bucket/reports/${currentPhpFile.fileName.replace('.php', '')}_report.txt`;
+    if (!currentReport || !firestore) return;
+    // Mock GCS path
+    const mockGcsPath = `gs://php-refactor-pro-bucket/reports/${currentPhpFile?.fileName?.replace('.php', '') || 'unknown_report'}.txt`;
+    const reportDocRef = doc(firestore, 'compatibilityReports', currentReport.id);
+    await updateDocumentNonBlocking(reportDocRef, { cloudStorageUrl: mockGcsPath });
     setCurrentReport(prev => prev ? { ...prev, cloudStorageUrl: mockGcsPath } : null);
-    toast({ title: 'Report Saved to Cloud (Mock)', description: `Mock save to: ${mockGcsPath}. No actual cloud write occurred.` });
+    toast({ title: 'Report Saved to Cloud (Mock)', description: `Report path: ${mockGcsPath}` });
   };
 
 
@@ -166,7 +186,7 @@ export default function FileUploadAndRefactorTab() {
             <UploadCloud className="mr-3 h-8 w-8" /> Upload & Refactor PHP File
           </CardTitle>
           <CardDescription>
-            Upload your legacy PHP file to refactor it for PHP 8.0 compatibility. Results are processed in your browser.
+            Upload your legacy PHP file to refactor it for PHP 8.0 compatibility.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -191,7 +211,7 @@ export default function FileUploadAndRefactorTab() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing}>
+                <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!user || isProcessing}>
                   {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                   Upload and Refactor
                 </Button>

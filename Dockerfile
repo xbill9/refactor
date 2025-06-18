@@ -49,6 +49,7 @@ COPY --from=builder /app/package-lock.json* ./
 # --omit=dev is for npm v7+. For older npm versions, use --production.
 RUN npm install --omit=dev --frozen-lockfile
 
+ENV CLOUD_LOGGING_ONLY=true
 # Expose the port the app runs on (Next.js default is 3000)
 EXPOSE 3000
 
