@@ -36,7 +36,6 @@ ENV NODE_ENV production
 # USER nextjs
 
 # Copy necessary files from the 'builder' stage
-COPY --from=builder /app/public ./public
 # The .next folder contains the optimized build output
 COPY --from=builder /app/.next ./.next
 # Copy package.json to install production dependencies and run start script
