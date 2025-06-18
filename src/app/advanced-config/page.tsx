@@ -16,11 +16,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Cog } from 'lucide-react';
 
 const AVAILABLE_MODELS = [
-  { id: 'googleai/gemini-2.5-flash-lite-preview-06-17', name: 'Gemini 2.5 Flash Lite Preview' },
+  { id: 'googleai/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'googleai/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
   { id: 'googleai/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-  { id: 'googleai/gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash Latest' },
-  { id: 'googleai/gemini-pro', name: 'Gemini Pro' },
-  // Add other models as needed
+  { id: 'googleai/gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
+  { id: 'googleai/gemini-2.5-flash-lite-preview-06-17', name: 'Gemini 2.5 Flash Lite Preview' },
 ];
 
 const LOCAL_STORAGE_KEY = 'advancedAiConfig';
