@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Cog } from 'lucide-react';
 
+
 export const AVAILABLE_MODELS = [
   { id: 'googleai/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
   { id: 'googleai/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
