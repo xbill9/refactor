@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
+// import { getAuth, connectAuthEmulator } from 'firebase/auth'; // Auth removed
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
@@ -30,14 +30,14 @@ export function initializeFirebase() {
         console.info('Automatic initialization failed. Falling back to firebase config object.', e);
         firebaseApp = initializeApp(firebaseConfig);
       }
-      const auth = getAuth(firebaseApp);
+      // const auth = getAuth(firebaseApp); // Auth removed
       const firestore = getFirestore(firebaseApp);
-      return { firebaseApp, auth, firestore };
+      return { firebaseApp, /*auth,*/ firestore }; // Auth removed
     } else {
       // When not in production, initializeApp should be called with the provided firebaseConfig
       // object that was imported.
       const firebaseApp = initializeApp(firebaseConfig);
-      const auth = getAuth(firebaseApp);
+      // const auth = getAuth(firebaseApp); // Auth removed
       const firestore = getFirestore(firebaseApp);
       // This environment variable value contains the full domain URL and never a localhost value.
       // This domain looks something like: 8080-firebase-studio-174474.cluster-krbdp4txefbbsv3zfyg3a4xp6y.cloudworkstations.dev
@@ -47,19 +47,19 @@ export function initializeFirebase() {
       connectFirestoreEmulator(firestore, firestoreHost, 443);
       // This environment variable value contains the full domain URL and never a localhost value.
       // This domain looks something like: 9099-firebase-studio-174474.cluster-krbdp4txefbbsv3zfyg3a4xp6y.cloudworkstations.dev
-      const authHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST!;
+      // const authHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST!; // Auth removed
       // The auth emulator requires "https" since it is running from a cloud hosting
       // environment, served on a full domain.
-      connectAuthEmulator(auth, `https://${authHost}:443`);
-      return { firebaseApp, auth, firestore };
+      // connectAuthEmulator(auth, `https://${authHost}:443`); // Auth removed
+      return { firebaseApp, /*auth,*/ firestore }; // Auth removed
     }
   }
 
   // If already initialized, return the existing instances that are connected to the emulator
   const firebaseApp = getApp();
-  const auth = getAuth(firebaseApp);
+  // const auth = getAuth(firebaseApp); // Auth removed
   const firestore = getFirestore(firebaseApp);
-  return { firebaseApp, auth, firestore };
+  return { firebaseApp, /*auth,*/ firestore }; // Auth removed
 }
 
 export * from './provider';
@@ -67,4 +67,4 @@ export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './non-blocking-updates';
-export * from './non-blocking-login';
+// export * from './non-blocking-login'; // Auth removed

@@ -6,19 +6,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { BucketScanFormSchema, type BucketScanFormValues, type CloudBucketScan } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase'; // useUser removed
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, query, orderBy } from 'firebase/firestore'; // serverTimestamp, where removed
 import { HardDriveDownload, Search, Loader2, ListChecks, FolderGit2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 
 export default function BucketScanTab() {
-  const { user } = useUser();
+  // const { user } = useUser(); // user removed
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isScanning, setIsScanning] = useState(false);
@@ -32,22 +32,22 @@ export default function BucketScanTab() {
     },
   });
   
-  const userScansQuery = React.useMemo(() => {
-    if (!firestore || !user) return null;
+  // Updated query to fetch all scans, as userId is removed
+  const allScansQuery = React.useMemo(() => {
+    if (!firestore) return null;
     return query(
         collection(firestore, 'cloudBucketScans'), 
-        where('userId', '==', user.uid),
         orderBy('scanTimestamp', 'desc')
     );
-  }, [firestore, user]);
+  }, [firestore]);
 
-  const { data: scans, isLoading: isLoadingScans } = useCollection<CloudBucketScan>(userScansQuery);
+  const { data: scans, isLoading: isLoadingScans } = useCollection<CloudBucketScan>(allScansQuery);
 
   const onSubmit = async (data: BucketScanFormValues) => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in.' });
-      return;
-    }
+    // if (!user) { // Auth check removed
+    //   toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in.' });
+    //   return;
+    // }
      if (!firestore) {
        toast({ variant: 'destructive', title: 'Firestore Error', description: 'Firestore service is not available.' });
        return;
@@ -56,12 +56,12 @@ export default function BucketScanTab() {
     setIsScanning(true);
     try {
       const scanId = doc(collection(firestore, 'cloudBucketScans')).id;
-      const newScan: Omit<CloudBucketScan, 'id'> = {
-        userId: user.uid,
+      const newScan: Omit<CloudBucketScan, 'id'> = { // userId removed
+        // userId: user.uid,
         bucketName: data.bucketName,
         directoryPath: data.directoryPath || '',
         scanTimestamp: new Date().toISOString(),
-        phpFileIds: [], // This would be populated by a backend process
+        phpFileIds: [], 
         recursiveScan: data.recursiveScan,
       };
       
@@ -146,7 +146,7 @@ export default function BucketScanTab() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!user || isScanning}>
+              <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isScanning}> {/* Removed !user check */}
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                 Start Scan (Mock)
               </Button>

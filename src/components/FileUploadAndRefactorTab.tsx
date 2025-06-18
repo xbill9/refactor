@@ -10,20 +10,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore } from '@/firebase';
+import { useFirestore } from '@/firebase'; // useUser removed
 import { refactorPhpFile } from '@/ai/flows/refactor-php';
 import { generateCompatibilityReport as generateAiCompatibilityReport } from '@/ai/flows/generate-compatibility-report';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore'; // serverTimestamp removed as it's not used directly here anymore
 import CodeDiffView from './CodeDiffView';
-import { Download, Save, FileText, Cloud, Loader2, UploadCloud, FileCode } from 'lucide-react'; // Added FileCode
+import { Download, Save, FileText, Cloud, Loader2, UploadCloud, FileCode } from 'lucide-react'; 
 import { PhpIcon } from './icons/PhpIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function FileUploadAndRefactorTab() {
-  const { user } = useUser();
+  // const { user } = useUser(); // user removed
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -49,16 +49,16 @@ export default function FileUploadAndRefactorTab() {
   };
 
   const onSubmit = async (data: PhpFileUploadValues) => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to upload files.' });
-      return;
-    }
+    // if (!user) { // Auth check removed
+    //   toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in to upload files.' });
+    //   return;
+    // }
     if (!firestore) {
        toast({ variant: 'destructive', title: 'Firestore Error', description: 'Firestore service is not available.' });
        return;
     }
 
-    resetState(); // Reset state before new submission
+    resetState(); 
     setIsProcessing(true);
     setFileName(data.phpFile.name);
 
@@ -68,8 +68,8 @@ export default function FileUploadAndRefactorTab() {
 
       // 1. Create PhpFile document
       const phpFileId = doc(collection(firestore, 'phpFiles')).id;
-      const newPhpFile: Omit<PhpFile, 'id'> = {
-        userId: user.uid,
+      const newPhpFile: Omit<PhpFile, 'id'> = { // userId removed from PhpFile
+        // userId: user.uid, 
         fileName: data.phpFile.name,
         fileContent: fileContent,
         uploadTimestamp: new Date().toISOString(),
@@ -123,11 +123,9 @@ export default function FileUploadAndRefactorTab() {
     } catch (error: any) {
       console.error('Processing error:', error);
       toast({ variant: 'destructive', title: 'Processing Error', description: error.message || 'An unexpected error occurred.' });
-      resetState(); // Reset on error
+      resetState(); 
     } finally {
-      // Do not set isProcessing to false here if you want to keep showing results.
-      // Reset button will handle clearing results.
-      // setIsProcessing(false); // only if you want to allow new uploads immediately
+      // setIsProcessing(false); 
     }
   };
 
@@ -159,7 +157,6 @@ export default function FileUploadAndRefactorTab() {
   
   const handleSaveRefactoredToCloud = async () => {
     if (!currentTask || !firestore) return;
-    // Mock GCS path
     const mockGcsPath = `gs://php-refactor-pro-bucket/refactored_files/${currentPhpFile?.fileName || 'unknown.php'}`;
     const taskDocRef = doc(firestore, 'refactoringTasks', currentTask.id);
     await updateDocumentNonBlocking(taskDocRef, { cloudStorageUrl: mockGcsPath });
@@ -169,7 +166,6 @@ export default function FileUploadAndRefactorTab() {
 
   const handleSaveReportToCloud = async () => {
     if (!currentReport || !firestore) return;
-    // Mock GCS path
     const mockGcsPath = `gs://php-refactor-pro-bucket/reports/${currentPhpFile?.fileName?.replace('.php', '') || 'unknown_report'}.txt`;
     const reportDocRef = doc(firestore, 'compatibilityReports', currentReport.id);
     await updateDocumentNonBlocking(reportDocRef, { cloudStorageUrl: mockGcsPath });
@@ -211,7 +207,7 @@ export default function FileUploadAndRefactorTab() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!user || isProcessing}>
+                <Button type="submit" className="w-full md:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing}> {/* Removed !user check */}
                   {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                   Upload and Refactor
                 </Button>

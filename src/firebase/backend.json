@@ -1,31 +1,5 @@
 {
   "entities": {
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema",
-      "title": "User",
-      "description": "Represents a user of the PHP Refactor Pro application.",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "username": {
-          "type": "string",
-          "description": "The username of the user."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The email address of the user."
-        }
-      },
-      "required": [
-        "id",
-        "username",
-        "email"
-      ]
-    },
     "PhpFile": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "title": "PhpFile",
@@ -34,11 +8,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the PhpFile entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the unique identifier of the user who uploaded the file. (Relationship: User 1:N PhpFile)"
+          "description": "Unique identifier for the PhpFile entity."
         },
         "fileName": {
           "type": "string",
@@ -56,7 +26,6 @@
       },
       "required": [
         "id",
-        "userId",
         "fileName",
         "fileContent",
         "uploadTimestamp"
@@ -70,11 +39,15 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the RefactoringTask entity. The specific format and generation strategy depend on the target database implementation."
+          "description": "Unique identifier for the RefactoringTask entity."
         },
         "phpFileId": {
           "type": "string",
           "description": "Reference to the unique identifier of the original PhpFile being refactored. (Relationship: PhpFile 1:N RefactoringTask)"
+        },
+        "originalCode": {
+          "type": "string",
+          "description": "The original PHP code before refactoring."
         },
         "refactoredCode": {
           "type": "string",
@@ -103,6 +76,7 @@
       "required": [
         "id",
         "phpFileId",
+        "originalCode",
         "refactoredCode",
         "refactoringTimestamp"
       ]
@@ -115,7 +89,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CompatibilityReport entity. The specific format and generation strategy depend on the target database implementation."
+          "description": "Unique identifier for the CompatibilityReport entity."
         },
         "refactoringTaskId": {
           "type": "string",
@@ -160,11 +134,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the CloudBucketScan entity. The specific format and generation strategy depend on the target database implementation."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the unique identifier of the user who initiated the bucket scan. (Relationship: User 1:N CloudBucketScan)"
+          "description": "Unique identifier for the CloudBucketScan entity."
         },
         "bucketName": {
           "type": "string",
@@ -194,7 +164,6 @@
       },
       "required": [
         "id",
-        "userId",
         "bucketName",
         "scanTimestamp",
         "phpFileIds",
@@ -202,30 +171,9 @@
       ]
     }
   },
-  "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
-  },
+  "auth": null,
   "firestore": {
     "structure": [
-      {
-        "definition": {
-          "description": "Collection containing user profile documents.",
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "params": [
-            {
-              "description": "The unique ID of the user.",
-              "name": "userId"
-            }
-          ]
-        },
-        "path": "/users/{userId}"
-      },
       {
         "definition": {
           "description": "Collection containing PHP file documents.",
@@ -291,6 +239,6 @@
         "path": "/cloudBucketScans/{cloudBucketScanId}"
       }
     ],
-    "reasoning": "Based on the entities provided, the following Firestore collections are recommended:\n\n*   **users**: Stores user profile data. Document ID will be the user's unique ID.\n*   **phpFiles**: Stores PHP file metadata and content. Each document represents a file uploaded by a user.\n*   **refactoringTasks**: Stores information about each refactoring task performed on a PHP file.\n*   **compatibilityReports**: Stores compatibility reports generated after refactoring.\n*   **cloudBucketScans**: Stores metadata related to cloud bucket scans initiated by users.\n\nThe relationships between entities are maintained through document references within the respective collections, using the provided `userId`, `phpFileId`, `refactoringTaskId`, and `cloudBucketScanId` fields.  There will be no subcollections."
+    "reasoning": "User authentication has been removed. The 'users' collection and 'userId' fields in other entities have been removed. Firestore rules will be updated to allow public access or access based on data integrity rather than user identity."
   }
 }
