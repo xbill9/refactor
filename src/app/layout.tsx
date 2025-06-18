@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+// FirebaseClientProvider removed as Firebase SDK is no longer used client-side
+// import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
 import Navbar from '@/components/Navbar';
 
@@ -23,13 +24,12 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          <Navbar />
-          <main className="pt-16"> {/* Add padding top to avoid content overlap with fixed Navbar */}
-            {children}
-          </main>
-          <Toaster />
-        </FirebaseClientProvider>
+        {/* FirebaseClientProvider removed */}
+        <Navbar />
+        <main className="pt-16"> {/* Add padding top to avoid content overlap with fixed Navbar */}
+          {children}
+        </main>
+        <Toaster />
       </body>
     </html>
   );

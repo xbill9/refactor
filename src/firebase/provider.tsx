@@ -1,24 +1,20 @@
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo } from 'react';
-import type { FirebaseApp } from 'firebase/app';
-// Firestore and Auth related imports removed
+// type FirebaseApp removed as 'firebase/app' is not available.
 
 interface FirebaseProviderProps {
   children: ReactNode;
-  firebaseApp: FirebaseApp;
-  // Firestore and Auth props removed
+  firebaseApp: any; // Changed from FirebaseApp to any, will likely be null
 }
 
 export interface FirebaseContextState {
-  areServicesAvailable: boolean; 
-  firebaseApp: FirebaseApp | null;
-  // Firestore and Auth state removed
+  areServicesAvailable: boolean;
+  firebaseApp: any | null; // Changed from FirebaseApp to any
 }
 
 export interface FirebaseServices {
-  firebaseApp: FirebaseApp;
-  // Firestore and Auth services removed
+  firebaseApp: any; // Changed from FirebaseApp to any
 }
 
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
@@ -28,6 +24,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firebaseApp,
 }) => {
   const contextValue = useMemo((): FirebaseContextState => {
+    // Services are available if firebaseApp is not null,
+    // but it will be null if the SDK isn't present.
     const servicesAvailable = !!(firebaseApp);
     return {
       areServicesAvailable: servicesAvailable,
@@ -49,22 +47,21 @@ export const useFirebase = (): FirebaseServices => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
-  }
+  // if (!context.areServicesAvailable || !context.firebaseApp) {
+  //   // This error might be too strict if we expect Firebase to be optional/removed
+  //   // console.warn('Firebase core services not available. Check FirebaseProvider props.');
+  //   // Return nulls or a structure indicating unavailability
+  //   return { firebaseApp: null };
+  // }
+  // For now, let's assume if the context exists, firebaseApp could be null.
+  // The consuming code should check for firebaseApp's existence.
 
   return {
     firebaseApp: context.firebaseApp,
   };
 };
 
-// useFirestore hook removed
-// export const useFirestore = (): Firestore => {
-//   const { firestore } = useFirebase();
-//   return firestore;
-// };
-
-export const useFirebaseApp = (): FirebaseApp => {
+export const useFirebaseApp = (): any | null => { // Changed from FirebaseApp to any | null
   const { firebaseApp } = useFirebase();
   return firebaseApp;
 };

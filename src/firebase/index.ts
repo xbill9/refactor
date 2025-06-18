@@ -1,34 +1,22 @@
 'use client';
 
-import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-// Firebase App is still needed for potential other Firebase services like Genkit if it were to use Firebase Functions/Storage, etc.
-// For now, it's kept minimal.
+// Firebase app related imports removed as 'firebase/app' is no longer available.
+// This file is modified to prevent build errors.
+// Its exports are now minimal or no-ops if they depended on FirebaseApp.
+
+// Config import might still be here, but initializeApp will not use it effectively.
+// import { firebaseConfig } from '@/firebase/config';
 
 export function initializeFirebase() {
-  if (!getApps().length) {
-    if (process.env.NODE_ENV === "production") {
-      let firebaseApp: FirebaseApp;
-      try {
-        firebaseApp = initializeApp();
-      } catch (e) {
-        console.info('Automatic initialization failed. Falling back to firebase config object.', e);
-        firebaseApp = initializeApp(firebaseConfig);
-      }
-      return { firebaseApp };
-    } else {
-      const firebaseApp = initializeApp(firebaseConfig);
-      // Emulators for other services (like Auth, if re-added) would be connected here.
-      // Since Firestore is removed, no Firestore emulator connection is needed.
-      return { firebaseApp };
-    }
-  }
-
-  const firebaseApp = getApp();
-  return { firebaseApp };
+  // No Firebase app to initialize or connect to emulators if 'firebase/app' is not available.
+  // console.warn("Firebase SDK ('firebase/app') not found. Firebase initialization is a no-op.");
+  return { firebaseApp: null }; // Return null or an empty object for firebaseApp
 }
 
+// Re-exporting provider and client-provider, which will also be modified
+// to not depend on a live FirebaseApp instance.
 export * from './provider';
 export * from './client-provider';
-// Firestore specific exports (use-collection, use-doc, non-blocking-updates) are removed
-// as Firestore itself is removed.
+
+// Firestore specific exports (use-collection, use-doc, non-blocking-updates) were removed previously.
+// Auth specific exports (use-user) were also removed previously.
