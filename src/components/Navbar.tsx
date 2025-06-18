@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Code2, Settings } from 'lucide-react'; // Added Settings icon
-import AuthButtons from './AuthButtons';
+// import AuthButtons from './AuthButtons'; // AuthButtons removed
+import { Button } from '@/components/ui/button';
 
 export default function Navbar() {
   return (
@@ -28,11 +29,9 @@ export default function Navbar() {
                 </Link>
             </Button>
           </div>
-          <AuthButtons />
+          {/* <AuthButtons /> */} {/* AuthButtons removed */}
         </div>
       </div>
     </header>
   );
 }
-// Added Button import
-import { Button } from '@/components/ui/button';

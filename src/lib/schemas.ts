@@ -1,25 +1,20 @@
 import { z } from 'zod';
 
-export const UserSchema = z.object({
-  id: z.string(),
-  username: z.string().optional(),
-  email: z.string().email(),
-});
-export type User = z.infer<typeof UserSchema>;
+// UserSchema removed
 
 export const PhpFileSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  // userId: z.string(), // userId removed
   fileName: z.string(),
   fileContent: z.string(),
-  uploadTimestamp: z.string().datetime(), // or z.date() if using Firebase Timestamp objects directly
+  uploadTimestamp: z.string().datetime(), 
 });
 export type PhpFile = z.infer<typeof PhpFileSchema>;
 
 export const RefactoringTaskSchema = z.object({
   id: z.string(),
   phpFileId: z.string(),
-  originalCode: z.string(), // Added for diffing
+  originalCode: z.string(), 
   refactoredCode: z.string(),
   compatibilityReportId: z.string().nullable(),
   refactoringTimestamp: z.string().datetime(),
@@ -32,14 +27,14 @@ export const CompatibilityReportSchema = z.object({
   refactoringTaskId: z.string(),
   reportContent: z.string(),
   generationTimestamp: z.string().datetime(),
-  pdfUrl: z.string().nullable(), // Placeholder, actual PDF generation not implemented
+  pdfUrl: z.string().nullable(), 
   cloudStorageUrl: z.string().nullable(),
 });
 export type CompatibilityReport = z.infer<typeof CompatibilityReportSchema>;
 
 export const CloudBucketScanSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  // userId: z.string(), // userId removed
   bucketName: z.string(),
   directoryPath: z.string().optional(),
   scanTimestamp: z.string().datetime(),
@@ -70,25 +65,12 @@ export const BucketScanFormSchema = z.object({
 });
 export type BucketScanFormValues = z.infer<typeof BucketScanFormSchema>;
 
-export const LoginFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-});
-export type LoginFormValues = z.infer<typeof LoginFormSchema>;
-
-export const RegisterFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords do not match.",
-  path: ["confirmPassword"],
-});
-export type RegisterFormValues = z.infer<typeof RegisterFormSchema>;
+// LoginFormSchema removed
+// RegisterFormSchema removed
 
 export const AdvancedConfigFormSchema = z.object({
   model: z.string().min(1, "Please select a model."),
-  temperature: z.number().min(0).max(2).default(0.7), // Adjusted max to 2 as per some models
+  temperature: z.number().min(0).max(2).default(0.7),
   topP: z.number().min(0).max(1).default(0.9),
   customInstructions: z.string().optional(),
 });
