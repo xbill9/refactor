@@ -1,5 +1,5 @@
-# Firebase Studio
+# PHP Refactor Pro
 
-PHP Refactor Pro - refactors older PHP code to PHP8.0 
+Refactors older PHP code to be compatible with PHP8.0 
 
 Advanced Configuration allows the selection of the Gemini Model.
