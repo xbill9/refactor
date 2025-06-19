@@ -20,6 +20,7 @@ COPY . .
 # Set build-time environment variables if necessary
 # Example: ARG NEXT_PUBLIC_SOME_VAR
 # ENV NEXT_PUBLIC_SOME_VAR=${NEXT_PUBLIC_SOME_VAR}
+ENV CLOUD_LOGGING_ONLY=true
 RUN npm run build
 
 # Stage 3: Production image
