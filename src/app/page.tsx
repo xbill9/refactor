@@ -37,6 +37,41 @@ export default function HomePage() {
     }
   }, []);
 
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === LOCAL_STORAGE_KEY) {
+        console.log('Storage change detected for key:', LOCAL_STORAGE_KEY);
+        const savedConfigRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedConfigRaw) {
+          try {
+            const savedConfig = JSON.parse(savedConfigRaw) as AdvancedConfigFormValues;
+            if (savedConfig && savedConfig.model) {
+              const modelDetails = AVAILABLE_MODELS.find(m => m.id === savedConfig.model);
+              if (modelDetails) {
+                setSelectedModelName(modelDetails.name);
+              } else {
+                setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+              }
+            } else {
+              setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+            }
+          } catch (error) {
+            console.error('Failed to parse saved AI config from storage event:', error);
+            setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+          }
+        } else {
+          setSelectedModelName(`Default: ${AVAILABLE_MODELS[0]?.name || 'Unknown Model'}`);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
 
   // Removed isUserLoading, authChecked, and related loading state.
   // The page now renders content directly.
